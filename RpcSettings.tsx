@@ -89,8 +89,9 @@ function SingleSetting<T>({
     <div className={cl("single", { disabled })}>
       <Heading tag="h5">{label}</Heading>
       <TextInput
-        type="number"
-        placeholder="Enter an game ID"
+        type="text"
+        inputMode="numeric"
+        placeholder="Enter a game ID"
         value={state}
         onChange={handleChange}
         disabled={disabled}

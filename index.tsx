@@ -18,9 +18,7 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { getUserSettingLazy } from "@api/UserSettings";
-import { Divider } from "@components/Divider";
 import { ErrorCard } from "@components/ErrorCard";
-import { Flex } from "@components/Flex";
 import { Logger } from "@utils/Logger";
 import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
@@ -78,13 +76,18 @@ function getDetectableApplications() {
   detectableApplications ??= fetch(
     "https://discord.com/api/v10/applications/detectable",
     { credentials: "include" },
-  ).then(async (response) => {
-    if (!response.ok)
-      throw new Error(`Discord API returned ${response.status}`);
-    const data = (await response.json()) as DetectableApplication[];
-    logger.info("Fetched application data:", data);
-    return data;
-  });
+  )
+    .then(async (response) => {
+      if (!response.ok)
+        throw new Error(`Discord API returned ${response.status}`);
+      const data = (await response.json()) as DetectableApplication[];
+      logger.info("Fetched application data:", data);
+      return data;
+    })
+    .catch((error) => {
+      detectableApplications = undefined;
+      throw error;
+    });
 
   return detectableApplications;
 }
@@ -141,9 +144,12 @@ function containsInOrder(value: string, query: string) {
   return false;
 }
 
-function scoreApplication(application: DetectableApplication, query: string) {
+function scoreApplication(
+  application: DetectableApplication,
+  query: string,
+  queryTokens: string[],
+) {
   const name = normalizeSearchText(application.name);
-  const queryTokens = query.match(/[a-z0-9]+/g) ?? [];
   const nameTokens = application.name.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   let score = 0;
 
@@ -169,12 +175,13 @@ function scoreApplication(application: DetectableApplication, query: string) {
 export async function searchDetectableApplications(query: string) {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return [];
+  const queryTokens = query.toLowerCase().match(/[a-z0-9]+/g) ?? [];
 
   const applications = await getDetectableApplications();
   return applications
     .map((application) => ({
       application,
-      score: scoreApplication(application, normalizedQuery),
+      score: scoreApplication(application, normalizedQuery, queryTokens),
     }))
     .filter(({ score }) => score >= 150)
     .sort(
@@ -303,16 +310,6 @@ export default definePlugin({
             </Button>
           </ErrorCard>
         )}
-
-        {/* 
-        <Flex flexDirection="column" gap=".5em" className={Margins.top16}>
-          <Forms.FormText>
-            hi
-          </Forms.FormText>
-        </Flex>
-
-        <Divider className={Margins.top8} />
-        */}
 
         <div
           style={{
