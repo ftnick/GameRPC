@@ -19,6 +19,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
+import { isPluginEnabled } from "@api/PluginManager";
 import { getUserSettingLazy } from "@api/UserSettings";
 import { ErrorCard } from "@components/ErrorCard";
 import { Logger } from "@utils/Logger";
@@ -255,6 +256,27 @@ async function createActivity(): Promise<Activity | undefined> {
   return activity;
 }
 
+type ActivityPreview = {
+  status: "empty" | "active" | "unavailable" | "error";
+  activity?: Activity;
+};
+
+async function getActivityPreview(): Promise<ActivityPreview> {
+  if (!settings.store.appID) return { status: "empty" };
+
+  try {
+    const application = (await getDetectableApplications()).find(
+      (app) => app.id === settings.store.appID,
+    );
+    if (!application) return { status: "unavailable" };
+
+    const activity = await createActivity();
+    return activity ? { status: "active", activity } : { status: "error" };
+  } catch {
+    return { status: "error" };
+  }
+}
+
 export async function setRpc(disable?: boolean) {
   if (disable) {
     FluxDispatcher.dispatch({
@@ -305,8 +327,8 @@ export default definePlugin({
   ],
 
   settingsAboutComponent: () => {
-    const [activity] = useAwaiter(createActivity, {
-      fallbackValue: undefined,
+    const [preview, , previewLoading] = useAwaiter(getActivityPreview, {
+      fallbackValue: { status: "empty" as const },
       deps: Object.values(settings.store),
     });
     const gameActivityEnabled = ShowCurrentGame.useSetting();
@@ -314,6 +336,18 @@ export default definePlugin({
 
     return (
       <>
+        {!isPluginEnabled("GameRPC") && (
+          <ErrorCard
+            className={classes(Margins.top16, Margins.bottom16)}
+            style={{ padding: "1em" }}
+          >
+            <Forms.FormTitle>GameRPC is disabled</Forms.FormTitle>
+            <Forms.FormText>
+              Enable the GameRPC plugin to... enable the plugin..?
+            </Forms.FormText>
+          </ErrorCard>
+        )}
+
         {!gameActivityEnabled && (
           <ErrorCard
             className={classes(Margins.top16, Margins.bottom16)}
@@ -335,6 +369,19 @@ export default definePlugin({
           </ErrorCard>
         )}
 
+        <Forms.FormText className={Margins.top16}>
+          {previewLoading && "Loading activity preview..."}
+          {!previewLoading &&
+            preview.status === "empty" &&
+            "Enter a game ID to preview the activity."}
+          {!previewLoading &&
+            preview.status === "unavailable" &&
+            "This game ID is invalid or is not detectable by Discord."}
+          {!previewLoading &&
+            preview.status === "error" &&
+            "Discord's detectable applications service could not be reached."}
+        </Forms.FormText>
+
         <div
           style={{
             width: "284px",
@@ -344,9 +391,9 @@ export default definePlugin({
             background: "var(--background-mod-muted)",
           }}
         >
-          {activity && (
+          {preview.activity && (
             <ActivityView
-              activity={activity}
+              activity={preview.activity}
               user={UserStore.getCurrentUser()}
               currentUser={UserStore.getCurrentUser()}
             />

@@ -11,7 +11,14 @@ import { Heading } from "@components/Heading";
 import { resolveError } from "@components/settings/tabs/plugins/components/Common";
 import { debounce } from "@shared/debounce";
 import { classNameFactory } from "@utils/css";
-import { Text, TextInput, useEffect, useRef, useState } from "@webpack/common";
+import {
+  Button,
+  Text,
+  TextInput,
+  useEffect,
+  useRef,
+  useState,
+} from "@webpack/common";
 
 import GameRPCPlugin, {
   searchDetectableApplications,
@@ -96,6 +103,21 @@ function SingleSetting<T>({
         onChange={handleChange}
         disabled={disabled}
       />
+      {!!state && (
+        <Button
+          color={Button.Colors.TRANSPARENT}
+          onClick={() => {
+            validationRequest.current++;
+            settings.store[settingsKey] = "";
+            setState("");
+            onValueChange?.("");
+            setError(null);
+            updateRPC();
+          }}
+        >
+          Clear Game ID
+        </Button>
+      )}
       {error && (
         <Text className={cl("error")} variant="text-sm/normal">
           {error}
@@ -121,21 +143,25 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    searchDetectableApplications(query)
-      .then((applications) => {
-        if (request === searchRequest.current) setResults(applications);
-      })
-      .catch(() => {
-        if (request === searchRequest.current) {
-          setResults([]);
-          setError("Could not search Discord's detectable applications.");
-        }
-      })
-      .finally(() => {
-        if (request === searchRequest.current) setLoading(false);
-      });
+    const timeout = setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      searchDetectableApplications(query)
+        .then((applications) => {
+          if (request === searchRequest.current) setResults(applications);
+        })
+        .catch(() => {
+          if (request === searchRequest.current) {
+            setResults([]);
+            setError("Could not search Discord's detectable applications.");
+          }
+        })
+        .finally(() => {
+          if (request === searchRequest.current) setLoading(false);
+        });
+    }, 300);
+
+    return () => clearTimeout(timeout);
   }, [query]);
 
   function selectApplication(application: DetectableApplication) {
