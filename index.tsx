@@ -4,6 +4,8 @@
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
+    description:
+      "Enter a detectable Discord game ID, or search by name to resolve its application ID and show it as Rich Presence.",
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
@@ -32,6 +34,7 @@ import {
   FluxDispatcher,
   Forms,
   React,
+  Toasts,
   UserStore,
 } from "@webpack/common";
 
@@ -71,6 +74,24 @@ export const settings = definePluginSettings({
 }>();
 
 let detectableApplications: Promise<DetectableApplication[]> | undefined;
+let lastApiFailure: { message: string; time: number } | undefined;
+
+function reportApiFailure(error: unknown) {
+  const details = error instanceof Error ? error.message : String(error);
+  const rateLimited = details.includes("429");
+  const message = rateLimited
+    ? "Discord is rate-limiting GameRPC. Try again shortly."
+    : "GameRPC could not reach Discord's detectable applications API.";
+  const now = Date.now();
+
+  logger.error("Detectable applications request failed", error);
+  if (lastApiFailure?.message === message && now - lastApiFailure.time < 10_000)
+    return message;
+
+  lastApiFailure = { message, time: now };
+  Toasts.show(message, Toasts.Type.FAILURE);
+  return message;
+}
 
 function getDetectableApplications() {
   detectableApplications ??= fetch(
@@ -78,6 +99,8 @@ function getDetectableApplications() {
     { credentials: "include" },
   )
     .then(async (response) => {
+      if (response.status === 429)
+        throw new Error("Discord API rate limit (429)");
       if (!response.ok)
         throw new Error(`Discord API returned ${response.status}`);
       const data = (await response.json()) as DetectableApplication[];
@@ -86,6 +109,7 @@ function getDetectableApplications() {
     })
     .catch((error) => {
       detectableApplications = undefined;
+      reportApiFailure(error);
       throw error;
     });
 
@@ -102,8 +126,8 @@ export async function validateApplicationId(
       (app) => app.id === appID,
     );
     return application ? true : "This game ID is not valid or detectable.";
-  } catch {
-    return "Could not verify this game ID with Discord.";
+  } catch (error) {
+    return reportApiFailure(error);
   }
 }
 
@@ -203,7 +227,7 @@ async function createActivity(): Promise<Activity | undefined> {
       (app) => app.id === appID,
     );
   } catch (err) {
-    logger.error("Failed to fetch RPC data", err);
+    reportApiFailure(err);
     return;
   }
 
