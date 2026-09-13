@@ -1,5 +1,8 @@
 # GameRPC
 
+![License](https://img.shields.io/github/license/ftnick/GameRPC)
+![Last Commit](https://img.shields.io/github/last-commit/ftnick/GameRPC)
+
 Enter a Discord game ID and GameRPC looks it up through Discord's detectable applications API, then displays the game's name as your Rich Presence while preserving its application identity.
 
 > [!NOTE]
