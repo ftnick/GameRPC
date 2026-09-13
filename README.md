@@ -14,7 +14,7 @@ Enter a Discord game ID and GameRPC looks it up through Discord's detectable app
 From the root of your Vencord folder:
 
 ```bash
-git submodule add https://github.com/ftnick/GameRPC src/userplugins/GameRPC
+git submodule add -f https://github.com/ftnick/GameRPC src/userplugins/GameRPC
 ```
 
 Using a submodule means you can pull future updates just by running `git submodule update --remote` later, instead of re-cloning.
