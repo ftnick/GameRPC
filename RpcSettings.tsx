@@ -13,6 +13,7 @@ import { debounce } from "@shared/debounce";
 import { classNameFactory } from "@utils/css";
 import {
   Button,
+  Select,
   Text,
   TextInput,
   useEffect,
@@ -22,8 +23,10 @@ import {
 
 import GameRPCPlugin, {
   searchDetectableApplications,
+  resetTimestampStart,
   setRpc,
   settings,
+  TimestampMode,
   validateApplicationId,
   type DetectableApplication,
 } from ".";
@@ -44,6 +47,14 @@ interface TextOption<T> {
 function isAppIdValid(value: string) {
   if (!value) return true;
   if (!/^\d{16,21}$/.test(value)) return "Must be a valid Discord game ID.";
+  return true;
+}
+
+function isOffsetValid(value: string) {
+  if (!/^\d+(\.\d+)?$/.test(value))
+    return "Enter a non-negative number of minutes.";
+  if (Number(value) > 525_600)
+    return "The start offset cannot be longer than one year.";
   return true;
 }
 
@@ -89,6 +100,7 @@ function SingleSetting<T>({
     if (valid !== true) return;
 
     settings.store[settingsKey] = newValue;
+    resetTimestampStart();
     updateRPC();
   }
 
@@ -167,6 +179,7 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
   function selectApplication(application: DetectableApplication) {
     settings.store.appID = application.id;
     props.onSelect(application.id);
+    resetTimestampStart();
     updateRPC();
     setQuery(application.name);
     setResults([]);
@@ -211,6 +224,72 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
   );
 }
 
+function TimestampSettings() {
+  const currentSettings = settings.use();
+  const timestampMode = currentSettings.timestampMode ?? 0;
+  const offset = String(currentSettings.startOffsetMinutes ?? 0);
+  const [offsetState, setOffsetState] = useState(offset);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOffsetState(offset);
+  }, [offset]);
+
+  function updateTimestampSettings() {
+    updateRPC();
+  }
+
+  function handleOffsetChange(value: string) {
+    setOffsetState(value);
+    const valid = isOffsetValid(value);
+    setError(resolveError(valid));
+    if (valid !== true) return;
+
+    settings.store.startOffsetMinutes = Number(value);
+    resetTimestampStart();
+    updateTimestampSettings();
+  }
+
+  return (
+    <div className={cl("timestamp")}>
+      <Heading tag="h5">Timestamp</Heading>
+      <Select
+        options={[
+          { label: "NOW", value: TimestampMode.NOW },
+          { label: "Custom start", value: TimestampMode.CUSTOM_START },
+        ]}
+        select={(value) => {
+          settings.store.timestampMode = value;
+          resetTimestampStart();
+          updateTimestampSettings();
+        }}
+        isSelected={(value) => value === timestampMode}
+        serialize={(value) => String(value)}
+      />
+      {timestampMode === TimestampMode.CUSTOM_START && (
+        <>
+          <TextInput
+            type="text"
+            inputMode="decimal"
+            placeholder="Minutes elapsed"
+            value={offsetState}
+            onChange={handleOffsetChange}
+          />
+          <Text variant="text-sm/normal">
+            Start the activity this many minutes in the past. For example, 60
+            means it will appear to have been running for one hour.
+          </Text>
+          {error && (
+            <Text className={cl("error")} variant="text-sm/normal">
+              {error}
+            </Text>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function RPCSettings() {
   const currentSettings = settings.use();
   const [appID, setAppID] = useState(currentSettings.appID ?? "");
@@ -228,6 +307,7 @@ export function RPCSettings() {
         onValueChange={setAppID}
       />
       {!appID.trim() && <ApplicationSearch onSelect={setAppID} />}
+      <TimestampSettings />
     </div>
   );
 }

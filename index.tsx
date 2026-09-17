@@ -63,6 +63,7 @@ export interface DetectableApplication {
 
 export const enum TimestampMode {
   NOW,
+  CUSTOM_START,
 }
 
 export const settings = definePluginSettings({
@@ -72,10 +73,14 @@ export const settings = definePluginSettings({
   },
 }).withPrivateSettings<{
   appID?: string;
+  timestampMode?: TimestampMode;
+  startOffsetMinutes?: number;
+  startTime?: number;
 }>();
 
 let detectableApplications: Promise<DetectableApplication[]> | undefined;
 let lastApiFailure: { message: string; time: number } | undefined;
+let rpcRequestGeneration = 0;
 
 function reportApiFailure(error: unknown) {
   const details = error instanceof Error ? error.message : String(error);
@@ -244,16 +249,38 @@ async function createActivity(): Promise<Activity | undefined> {
     flags: 1 << 0,
   };
 
-  const timestampMode = TimestampMode.NOW;
+  const timestampMode = settings.store.timestampMode ?? TimestampMode.NOW;
+  const startTime =
+    settings.store.startTime ??
+    (settings.store.startTime =
+      Date.now() -
+      (timestampMode === TimestampMode.CUSTOM_START
+        ? Math.max(0, settings.store.startOffsetMinutes ?? 0) * 60_000
+        : 0));
+
   switch (timestampMode) {
     case TimestampMode.NOW:
       activity.timestamps = {
-        start: Date.now(),
+        start: startTime,
+      };
+      break;
+    case TimestampMode.CUSTOM_START:
+      activity.timestamps = {
+        start: startTime,
       };
       break;
   }
 
   return activity;
+}
+
+export function resetTimestampStart() {
+  const timestampMode = settings.store.timestampMode ?? TimestampMode.NOW;
+  const offset =
+    timestampMode === TimestampMode.CUSTOM_START
+      ? Math.max(0, settings.store.startOffsetMinutes ?? 0) * 60_000
+      : 0;
+  settings.store.startTime = Date.now() - offset;
 }
 
 type ActivityPreview = {
@@ -278,6 +305,8 @@ async function getActivityPreview(): Promise<ActivityPreview> {
 }
 
 export async function setRpc(disable?: boolean) {
+  const requestGeneration = ++rpcRequestGeneration;
+
   if (disable) {
     FluxDispatcher.dispatch({
       type: "LOCAL_ACTIVITY_UPDATE",
@@ -288,6 +317,7 @@ export async function setRpc(disable?: boolean) {
   }
 
   const activity: Activity | undefined = await createActivity();
+  if (requestGeneration !== rpcRequestGeneration) return;
 
   FluxDispatcher.dispatch({
     type: "LOCAL_ACTIVITY_UPDATE",
@@ -312,7 +342,10 @@ export default definePlugin({
   requiresRestart: false,
   settings,
 
-  start: setRpc,
+  start: () => {
+    resetTimestampStart();
+    return setRpc();
+  },
   stop: () => setRpc(true),
 
   // Discord hides buttons on your own Rich Presence for some reason. This patch disables that behaviour
