@@ -22,6 +22,28 @@
     color: var(--text-feedback-critical);
 }
 
+.vc-gameRPC-settings-timestamp {
+    display: grid;
+    gap: 0.5em;
+}
+
+.vc-gameRPC-settings-timestamp-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+}
+
+.vc-gameRPC-settings-timestamp {
+    display: grid;
+    gap: 0.5em;
+}
+
+.vc-gameRPC-settings-timestamp-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+}
+
 .vc-gameRPC-settings-search {
     display: grid;
     gap: 0.5em;

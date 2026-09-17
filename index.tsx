@@ -4,8 +4,6 @@
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
-    description:
-      "Enter a detectable Discord game ID, or search by name to resolve its application ID and show it as Rich Presence.",
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
@@ -251,12 +249,7 @@ async function createActivity(): Promise<Activity | undefined> {
 
   const timestampMode = settings.store.timestampMode ?? TimestampMode.NOW;
   const startTime =
-    settings.store.startTime ??
-    (settings.store.startTime =
-      Date.now() -
-      (timestampMode === TimestampMode.CUSTOM_START
-        ? Math.max(0, settings.store.startOffsetMinutes ?? 0) * 60_000
-        : 0));
+    settings.store.startTime ?? (settings.store.startTime = Date.now());
 
   switch (timestampMode) {
     case TimestampMode.NOW:
@@ -276,11 +269,12 @@ async function createActivity(): Promise<Activity | undefined> {
 
 export function resetTimestampStart() {
   const timestampMode = settings.store.timestampMode ?? TimestampMode.NOW;
-  const offset =
-    timestampMode === TimestampMode.CUSTOM_START
-      ? Math.max(0, settings.store.startOffsetMinutes ?? 0) * 60_000
-      : 0;
-  settings.store.startTime = Date.now() - offset;
+  if (timestampMode === TimestampMode.NOW) {
+    settings.store.startTime = Date.now();
+    return;
+  }
+
+  settings.store.startTime ??= Date.now();
 }
 
 type ActivityPreview = {

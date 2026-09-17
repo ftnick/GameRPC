@@ -50,14 +50,6 @@ function isAppIdValid(value: string) {
   return true;
 }
 
-function isOffsetValid(value: string) {
-  if (!/^\d+(\.\d+)?$/.test(value))
-    return "Enter a non-negative number of minutes.";
-  if (Number(value) > 525_600)
-    return "The start offset cannot be longer than one year.";
-  return true;
-}
-
 const updateRPC = debounce(() => {
   setRpc(true);
   if (isPluginEnabled(GameRPCPlugin.name)) setRpc();
@@ -226,37 +218,67 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
 
 function TimestampSettings() {
   const currentSettings = settings.use();
-  const timestampMode = currentSettings.timestampMode ?? 0;
-  const offset = String(currentSettings.startOffsetMinutes ?? 0);
-  const [offsetState, setOffsetState] = useState(offset);
+  const timestampMode = currentSettings.timestampMode ?? TimestampMode.NOW;
+  const [startTimeState, setStartTimeState] = useState(
+    String(currentSettings.startTime ?? Date.now()),
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setOffsetState(offset);
-  }, [offset]);
+    setStartTimeState(String(currentSettings.startTime ?? Date.now()));
+  }, [currentSettings.startTime, timestampMode]);
 
   function updateTimestampSettings() {
     updateRPC();
   }
 
-  function handleOffsetChange(value: string) {
-    setOffsetState(value);
-    const valid = isOffsetValid(value);
-    setError(resolveError(valid));
-    if (valid !== true) return;
-
-    settings.store.startOffsetMinutes = Number(value);
+  function applyStartTimestamp(value: number) {
+    settings.store.startTime = value;
     resetTimestampStart();
     updateTimestampSettings();
   }
 
+  function handleStartTimestampChange(value: string) {
+    setStartTimeState(value);
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      setError("Enter a Unix timestamp in milliseconds.");
+      return;
+    }
+
+    if (!/^\d+$/.test(trimmed)) {
+      setError("Start timestamp must be a whole number of milliseconds.");
+      return;
+    }
+
+    const numericValue = Number(trimmed);
+    setError(null);
+    applyStartTimestamp(numericValue);
+  }
+
+  function adjustTimestampBy(deltaMs: number) {
+    const currentTimestamp = Number(startTimeState) || Date.now();
+    const nextTimestamp = currentTimestamp + deltaMs;
+    setStartTimeState(String(nextTimestamp));
+    settings.store.startTime = nextTimestamp;
+    resetTimestampStart();
+    updateTimestampSettings();
+  }
+
+  const startTimeWarning =
+    timestampMode === TimestampMode.CUSTOM_START &&
+    Number(startTimeState) > Date.now()
+      ? "Warning: this start timestamp is in the future and will make the elapsed time negative."
+      : null;
+
   return (
     <div className={cl("timestamp")}>
-      <Heading tag="h5">Timestamp</Heading>
+      <Heading tag="h5">Timestamp Mode</Heading>
       <Select
         options={[
-          { label: "NOW", value: TimestampMode.NOW },
-          { label: "Custom start", value: TimestampMode.CUSTOM_START },
+          { label: "Now", value: TimestampMode.NOW },
+          { label: "Custom", value: TimestampMode.CUSTOM_START },
         ]}
         select={(value) => {
           settings.store.timestampMode = value;
@@ -270,18 +292,47 @@ function TimestampSettings() {
         <>
           <TextInput
             type="text"
-            inputMode="decimal"
-            placeholder="Minutes elapsed"
-            value={offsetState}
-            onChange={handleOffsetChange}
+            inputMode="numeric"
+            placeholder="Start timestamp (in miliseconds)"
+            value={startTimeState}
+            onChange={handleStartTimestampChange}
           />
+          <div className={cl("timestamp-actions")}>
+            <Button
+              color={Button.Colors.TRANSPARENT}
+              onClick={() => {
+                const now = Date.now();
+                setStartTimeState(String(now));
+                applyStartTimestamp(now);
+              }}
+            >
+              Set timestamp to now
+            </Button>
+            <Button
+              color={Button.Colors.TRANSPARENT}
+              onClick={() => adjustTimestampBy(-60_000)}
+            >
+              Add time passed
+            </Button>
+            <Button
+              color={Button.Colors.TRANSPARENT}
+              onClick={() => adjustTimestampBy(60_000)}
+            >
+              Remove time passed
+            </Button>
+          </div>
           <Text variant="text-sm/normal">
-            Start the activity this many minutes in the past. For example, 60
-            means it will appear to have been running for one hour.
+            Set the start time for your activity. Each time button adds or
+            removes one minute from the elapsed time.
           </Text>
           {error && (
             <Text className={cl("error")} variant="text-sm/normal">
               {error}
+            </Text>
+          )}
+          {startTimeWarning && (
+            <Text className={cl("error")} variant="text-sm/normal">
+              {startTimeWarning}
             </Text>
           )}
         </>
