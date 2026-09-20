@@ -5,12 +5,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ftnick/GameRPC/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/ftnick/GameRPC" alt="License">
-  </a>
-  <a href="https://github.com/ftnick/GameRPC/commits/main">
-    <img src="https://img.shields.io/github/last-commit/ftnick/GameRPC" alt="Last commit">
-  </a>
+  <a href="https://github.com/ftnick/GameRPC/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ftnick/GameRPC" alt="License"></a>
+  <a href="https://github.com/ftnick/GameRPC/commits/main"><img src="https://img.shields.io/github/last-commit/ftnick/GameRPC" alt="Last commit"></a>
 </p>
 
 > [!NOTE]
