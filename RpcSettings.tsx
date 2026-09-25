@@ -179,7 +179,7 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
 
   return (
     <div className={cl("search")}>
-      <Heading tag="h5">Don't have a game ID, but know your game name?</Heading>
+      <Heading tag="h5">Don't have a game ID, but know the game name?</Heading>
       <TextInput
         type="text"
         placeholder="Search for a game"
