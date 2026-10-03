@@ -22,8 +22,10 @@ import {
 
 import GameRPCPlugin, {
   searchDetectableApplications,
+  resetTimestampStart,
   setRpc,
   settings,
+  TimestampMode,
   validateApplicationId,
   type DetectableApplication,
 } from ".";
@@ -89,6 +91,7 @@ function SingleSetting<T>({
     if (valid !== true) return;
 
     settings.store[settingsKey] = newValue;
+    resetTimestampStart();
     updateRPC();
   }
 
@@ -167,6 +170,7 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
   function selectApplication(application: DetectableApplication) {
     settings.store.appID = application.id;
     props.onSelect(application.id);
+    resetTimestampStart();
     updateRPC();
     setQuery(application.name);
     setResults([]);
@@ -174,7 +178,7 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
 
   return (
     <div className={cl("search")}>
-      <Heading tag="h5">Don't have a game ID, but know your game name?</Heading>
+      <Heading tag="h5">Don't have a game ID, but know the game name?</Heading>
       <TextInput
         type="text"
         placeholder="Search for a game"
@@ -211,6 +215,78 @@ function ApplicationSearch(props: { onSelect: (appID: string) => void }) {
   );
 }
 
+function TimestampSettings() {
+  const currentSettings = settings.use();
+  const timestampMode = currentSettings.timestampMode ?? TimestampMode.NOW;
+  const [startTimeState, setStartTimeState] = useState(
+    timestampMode === TimestampMode.CUSTOM_START && currentSettings.startTime
+      ? String(Math.floor(currentSettings.startTime / 1000))
+      : "",
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setStartTimeState(
+      timestampMode === TimestampMode.CUSTOM_START && currentSettings.startTime
+        ? String(Math.floor(currentSettings.startTime / 1000))
+        : "",
+    );
+  }, [currentSettings.startTime, timestampMode]);
+
+  function updateTimestampSettings() {
+    updateRPC();
+  }
+
+  function handleStartTimestampChange(value: string) {
+    setStartTimeState(value);
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      setError(null);
+      settings.store.timestampMode = TimestampMode.NOW;
+      resetTimestampStart();
+      updateTimestampSettings();
+      return;
+    }
+
+    if (!/^\d+$/.test(trimmed)) {
+      setError("Enter a whole Unix timestamp in seconds.");
+      return;
+    }
+
+    const timestampSeconds = Number(trimmed);
+    const timestampMilliseconds = timestampSeconds * 1000;
+    if (!Number.isSafeInteger(timestampMilliseconds)) {
+      setError("Enter a valid Unix timestamp in seconds.");
+      return;
+    }
+
+    setError(null);
+    settings.store.timestampMode = TimestampMode.CUSTOM_START;
+    settings.store.startTime = timestampMilliseconds;
+    resetTimestampStart();
+    updateTimestampSettings();
+  }
+
+  return (
+    <div className={cl("timestamp")}>
+      <Heading tag="h5">Start Timestamp (Unix seconds)</Heading>
+      <TextInput
+        type="text"
+        inputMode="numeric"
+        placeholder="Leave blank to use now"
+        value={startTimeState}
+        onChange={handleStartTimestampChange}
+      />
+      {error && (
+        <Text className={cl("error")} variant="text-sm/normal">
+          {error}
+        </Text>
+      )}
+    </div>
+  );
+}
+
 export function RPCSettings() {
   const currentSettings = settings.use();
   const [appID, setAppID] = useState(currentSettings.appID ?? "");
@@ -228,6 +304,7 @@ export function RPCSettings() {
         onValueChange={setAppID}
       />
       {!appID.trim() && <ApplicationSearch onSelect={setAppID} />}
+      <TimestampSettings />
     </div>
   );
 }
