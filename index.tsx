@@ -409,23 +409,24 @@ export default definePlugin({
             "Discord's detectable applications service could not be reached."}
         </Forms.FormText>
 
-        <div
-          style={{
-            width: "284px",
-            ...profileThemeStyle,
-            marginTop: 8,
-            borderRadius: 8,
-            background: "var(--background-mod-muted)",
-          }}
-        >
-          {preview.activity && (
-            <ActivityView
-              activity={preview.activity}
-              user={UserStore.getCurrentUser()}
-              currentUser={UserStore.getCurrentUser()}
-            />
-          )}
-        </div>
+        {React.createElement(
+          "div",
+          {
+            style: {
+              width: "284px",
+              ...profileThemeStyle,
+              marginTop: 8,
+              borderRadius: 8,
+              background: "var(--background-mod-muted)",
+            },
+          },
+          preview.activity &&
+            React.createElement(ActivityView, {
+              activity: preview.activity,
+              user: UserStore.getCurrentUser(),
+              currentUser: UserStore.getCurrentUser(),
+            }),
+        )}
       </>
     );
   },

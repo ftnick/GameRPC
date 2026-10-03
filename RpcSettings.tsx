@@ -13,7 +13,6 @@ import { debounce } from "@shared/debounce";
 import { classNameFactory } from "@utils/css";
 import {
   Button,
-  Select,
   Text,
   TextInput,
   useEffect,
@@ -220,22 +219,22 @@ function TimestampSettings() {
   const currentSettings = settings.use();
   const timestampMode = currentSettings.timestampMode ?? TimestampMode.NOW;
   const [startTimeState, setStartTimeState] = useState(
-    String(currentSettings.startTime ?? Date.now()),
+    timestampMode === TimestampMode.CUSTOM_START && currentSettings.startTime
+      ? String(Math.floor(currentSettings.startTime / 1000))
+      : "",
   );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setStartTimeState(String(currentSettings.startTime ?? Date.now()));
+    setStartTimeState(
+      timestampMode === TimestampMode.CUSTOM_START && currentSettings.startTime
+        ? String(Math.floor(currentSettings.startTime / 1000))
+        : "",
+    );
   }, [currentSettings.startTime, timestampMode]);
 
   function updateTimestampSettings() {
     updateRPC();
-  }
-
-  function applyStartTimestamp(value: number) {
-    settings.store.startTime = value;
-    resetTimestampStart();
-    updateTimestampSettings();
   }
 
   function handleStartTimestampChange(value: string) {
@@ -243,99 +242,46 @@ function TimestampSettings() {
     const trimmed = value.trim();
 
     if (!trimmed) {
-      setError("Enter a Unix timestamp in milliseconds.");
+      setError(null);
+      settings.store.timestampMode = TimestampMode.NOW;
+      resetTimestampStart();
+      updateTimestampSettings();
       return;
     }
 
     if (!/^\d+$/.test(trimmed)) {
-      setError("Start timestamp must be a whole number of milliseconds.");
+      setError("Enter a whole Unix timestamp in seconds.");
       return;
     }
 
-    const numericValue = Number(trimmed);
-    setError(null);
-    applyStartTimestamp(numericValue);
-  }
+    const timestampSeconds = Number(trimmed);
+    const timestampMilliseconds = timestampSeconds * 1000;
+    if (!Number.isSafeInteger(timestampMilliseconds)) {
+      setError("Enter a valid Unix timestamp in seconds.");
+      return;
+    }
 
-  function adjustTimestampBy(deltaMs: number) {
-    const currentTimestamp = Number(startTimeState) || Date.now();
-    const nextTimestamp = currentTimestamp + deltaMs;
-    setStartTimeState(String(nextTimestamp));
-    settings.store.startTime = nextTimestamp;
+    setError(null);
+    settings.store.timestampMode = TimestampMode.CUSTOM_START;
+    settings.store.startTime = timestampMilliseconds;
     resetTimestampStart();
     updateTimestampSettings();
   }
 
-  const startTimeWarning =
-    timestampMode === TimestampMode.CUSTOM_START &&
-    Number(startTimeState) > Date.now()
-      ? "Warning: this start timestamp is in the future and will make the elapsed time negative."
-      : null;
-
   return (
     <div className={cl("timestamp")}>
-      <Heading tag="h5">Timestamp Mode</Heading>
-      <Select
-        options={[
-          { label: "Now", value: TimestampMode.NOW },
-          { label: "Custom", value: TimestampMode.CUSTOM_START },
-        ]}
-        select={(value) => {
-          settings.store.timestampMode = value;
-          resetTimestampStart();
-          updateTimestampSettings();
-        }}
-        isSelected={(value) => value === timestampMode}
-        serialize={(value) => String(value)}
+      <Heading tag="h5">Start Timestamp (Unix seconds)</Heading>
+      <TextInput
+        type="text"
+        inputMode="numeric"
+        placeholder="Leave blank to use now"
+        value={startTimeState}
+        onChange={handleStartTimestampChange}
       />
-      {timestampMode === TimestampMode.CUSTOM_START && (
-        <>
-          <TextInput
-            type="text"
-            inputMode="numeric"
-            placeholder="Start timestamp (in miliseconds)"
-            value={startTimeState}
-            onChange={handleStartTimestampChange}
-          />
-          <div className={cl("timestamp-actions")}>
-            <Button
-              color={Button.Colors.TRANSPARENT}
-              onClick={() => {
-                const now = Date.now();
-                setStartTimeState(String(now));
-                applyStartTimestamp(now);
-              }}
-            >
-              Set timestamp to now
-            </Button>
-            <Button
-              color={Button.Colors.TRANSPARENT}
-              onClick={() => adjustTimestampBy(-60_000)}
-            >
-              Add time passed
-            </Button>
-            <Button
-              color={Button.Colors.TRANSPARENT}
-              onClick={() => adjustTimestampBy(60_000)}
-            >
-              Remove time passed
-            </Button>
-          </div>
-          <Text variant="text-sm/normal">
-            Set the start time for your activity. Each time button adds or
-            removes one minute from the elapsed time.
-          </Text>
-          {error && (
-            <Text className={cl("error")} variant="text-sm/normal">
-              {error}
-            </Text>
-          )}
-          {startTimeWarning && (
-            <Text className={cl("error")} variant="text-sm/normal">
-              {startTimeWarning}
-            </Text>
-          )}
-        </>
+      {error && (
+        <Text className={cl("error")} variant="text-sm/normal">
+          {error}
+        </Text>
       )}
     </div>
   );
