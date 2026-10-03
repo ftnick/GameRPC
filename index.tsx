@@ -315,7 +315,7 @@ export async function setRpc(disable?: boolean) {
 
   FluxDispatcher.dispatch({
     type: "LOCAL_ACTIVITY_UPDATE",
-    activity,
+    activity: activity ?? null,
     socketId: "GameRPC",
   });
 }
